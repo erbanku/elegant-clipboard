@@ -7,17 +7,17 @@
 const TASK_NAME: &str = "ElegantClipboard_AdminElevation";
 
 #[cfg(target_os = "windows")]
-use windows::core::BSTR;
-#[cfg(target_os = "windows")]
 use windows::Win32::Foundation::VARIANT_BOOL;
 #[cfg(target_os = "windows")]
 use windows::Win32::System::Com::{
-    CoCreateInstance, CoInitializeEx, CLSCTX_INPROC_SERVER, COINIT_APARTMENTTHREADED,
+    CLSCTX_INPROC_SERVER, COINIT_APARTMENTTHREADED, CoCreateInstance, CoInitializeEx,
 };
 #[cfg(target_os = "windows")]
 use windows::Win32::System::TaskScheduler::*;
 #[cfg(target_os = "windows")]
 use windows::Win32::System::Variant::VARIANT;
+#[cfg(target_os = "windows")]
+use windows::core::BSTR;
 #[cfg(target_os = "windows")]
 use windows_core::Interface;
 
@@ -27,9 +27,8 @@ fn get_task_root() -> Result<(ITaskService, ITaskFolder), String> {
     unsafe {
         let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
 
-        let service: ITaskService =
-            CoCreateInstance(&TaskScheduler, None, CLSCTX_INPROC_SERVER)
-                .map_err(|e| format!("TaskService 创建失败: {e}"))?;
+        let service: ITaskService = CoCreateInstance(&TaskScheduler, None, CLSCTX_INPROC_SERVER)
+            .map_err(|e| format!("TaskService 创建失败: {e}"))?;
 
         service
             .Connect(
@@ -65,26 +64,48 @@ pub fn create_elevation_task() -> Result<(), String> {
 
         // 设置
         let settings = task.Settings().map_err(|e| e.to_string())?;
-        settings.SetMultipleInstances(TASK_INSTANCES_PARALLEL).map_err(|e| e.to_string())?;
-        settings.SetDisallowStartIfOnBatteries(VARIANT_BOOL(0)).map_err(|e| e.to_string())?;
-        settings.SetStopIfGoingOnBatteries(VARIANT_BOOL(0)).map_err(|e| e.to_string())?;
-        settings.SetAllowDemandStart(VARIANT_BOOL(-1)).map_err(|e| e.to_string())?;
-        settings.SetEnabled(VARIANT_BOOL(-1)).map_err(|e| e.to_string())?;
-        settings.SetStartWhenAvailable(VARIANT_BOOL(0)).map_err(|e| e.to_string())?;
-        settings.SetRunOnlyIfNetworkAvailable(VARIANT_BOOL(0)).map_err(|e| e.to_string())?;
+        settings
+            .SetMultipleInstances(TASK_INSTANCES_PARALLEL)
+            .map_err(|e| e.to_string())?;
+        settings
+            .SetDisallowStartIfOnBatteries(VARIANT_BOOL(0))
+            .map_err(|e| e.to_string())?;
+        settings
+            .SetStopIfGoingOnBatteries(VARIANT_BOOL(0))
+            .map_err(|e| e.to_string())?;
+        settings
+            .SetAllowDemandStart(VARIANT_BOOL(-1))
+            .map_err(|e| e.to_string())?;
+        settings
+            .SetEnabled(VARIANT_BOOL(-1))
+            .map_err(|e| e.to_string())?;
+        settings
+            .SetStartWhenAvailable(VARIANT_BOOL(0))
+            .map_err(|e| e.to_string())?;
+        settings
+            .SetRunOnlyIfNetworkAvailable(VARIANT_BOOL(0))
+            .map_err(|e| e.to_string())?;
 
         let idle = settings.IdleSettings().map_err(|e| e.to_string())?;
-        idle.SetStopOnIdleEnd(VARIANT_BOOL(0)).map_err(|e| e.to_string())?;
-        idle.SetRestartOnIdle(VARIANT_BOOL(0)).map_err(|e| e.to_string())?;
+        idle.SetStopOnIdleEnd(VARIANT_BOOL(0))
+            .map_err(|e| e.to_string())?;
+        idle.SetRestartOnIdle(VARIANT_BOOL(0))
+            .map_err(|e| e.to_string())?;
 
         // 主体
         let principal = task.Principal().map_err(|e| e.to_string())?;
-        principal.SetLogonType(TASK_LOGON_INTERACTIVE_TOKEN).map_err(|e| e.to_string())?;
-        principal.SetRunLevel(TASK_RUNLEVEL_HIGHEST).map_err(|e| e.to_string())?;
+        principal
+            .SetLogonType(TASK_LOGON_INTERACTIVE_TOKEN)
+            .map_err(|e| e.to_string())?;
+        principal
+            .SetRunLevel(TASK_RUNLEVEL_HIGHEST)
+            .map_err(|e| e.to_string())?;
 
         // 操作
         let actions = task.Actions().map_err(|e| e.to_string())?;
-        let action: IAction = actions.Create(TASK_ACTION_EXEC).map_err(|e| e.to_string())?;
+        let action: IAction = actions
+            .Create(TASK_ACTION_EXEC)
+            .map_err(|e| e.to_string())?;
         let exec_action: IExecAction = action.cast::<IExecAction>().map_err(|e| e.to_string())?;
         exec_action
             .SetPath(&BSTR::from(exe.to_string_lossy().as_ref()))

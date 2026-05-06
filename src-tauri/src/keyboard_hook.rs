@@ -3,8 +3,8 @@
 //! 实际按键处理由 Tauri global_shortcut 插件完成。
 
 use parking_lot::RwLock;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::LazyLock;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 // 窗口状态枚举
@@ -35,7 +35,9 @@ pub fn set_window_state(state: WindowState) {
 /// 窗口是否在指定毫秒内刚被隐藏
 pub fn was_recently_hidden(ms: u64) -> bool {
     let last = LAST_HIDDEN_AT.load(Ordering::Relaxed);
-    if last == 0 { return false; }
+    if last == 0 {
+        return false;
+    }
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()

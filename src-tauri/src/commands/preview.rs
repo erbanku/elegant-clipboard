@@ -136,7 +136,14 @@ pub async fn show_image_preview(
         return Ok(());
     }
     crate::positioning::force_topmost(&window);
-    tracing::debug!("image-preview shown at ({}, {}), size {}x{}, created={}", win_x, win_y, win_width, win_height, newly_created);
+    tracing::debug!(
+        "image-preview shown at ({}, {}), size {}x{}, created={}",
+        win_x,
+        win_y,
+        win_width,
+        win_height,
+        newly_created
+    );
     Ok(())
 }
 
@@ -245,7 +252,14 @@ pub async fn show_text_preview(
         return Ok(());
     }
     crate::positioning::force_topmost(&window);
-    tracing::debug!("text-preview shown at ({}, {}), size {}x{}, created={}", win_x, win_y, win_width, win_height, newly_created);
+    tracing::debug!(
+        "text-preview shown at ({}, {}), size {}x{}, created={}",
+        win_x,
+        win_y,
+        win_width,
+        win_height,
+        newly_created
+    );
 
     if newly_created {
         let window_clone = window.clone();
@@ -324,8 +338,8 @@ pub fn is_log_to_file_enabled() -> bool {
 fn apply_preview_window_effect(window: &tauri::WebviewWindow, effect: Option<&str>) {
     use windows::Win32::Foundation::HWND;
     use windows::Win32::UI::WindowsAndMessaging::{
-        GetWindowLongW, SetWindowLongW, SetWindowPos, GWL_EXSTYLE, WS_EX_LAYERED,
-        SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER,
+        GWL_EXSTYLE, GetWindowLongW, SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
+        SWP_NOZORDER, SetWindowLongW, SetWindowPos, WS_EX_LAYERED,
     };
 
     let effect = match effect {
@@ -340,9 +354,18 @@ fn apply_preview_window_effect(window: &tauri::WebviewWindow, effect: Option<&st
     unsafe {
         let ex_style = GetWindowLongW(hwnd, GWL_EXSTYLE);
         if (ex_style as u32) & WS_EX_LAYERED.0 != 0 {
-            SetWindowLongW(hwnd, GWL_EXSTYLE, ((ex_style as u32) & !WS_EX_LAYERED.0) as i32);
+            SetWindowLongW(
+                hwnd,
+                GWL_EXSTYLE,
+                ((ex_style as u32) & !WS_EX_LAYERED.0) as i32,
+            );
             let _ = SetWindowPos(
-                hwnd, None, 0, 0, 0, 0,
+                hwnd,
+                None,
+                0,
+                0,
+                0,
+                0,
                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED,
             );
         }
@@ -372,5 +395,8 @@ pub fn set_log_to_file(enabled: bool) -> Result<(), String> {
 
 #[tauri::command]
 pub fn get_log_file_path() -> String {
-    AppConfig::load().get_log_path().to_string_lossy().to_string()
+    AppConfig::load()
+        .get_log_path()
+        .to_string_lossy()
+        .to_string()
 }

@@ -53,7 +53,7 @@ pub fn disable_admin_launch() -> Result<(), String> {
 pub fn is_running_as_admin() -> bool {
     use windows::Win32::Foundation::CloseHandle;
     use windows::Win32::Security::{
-        GetTokenInformation, TokenElevation, TOKEN_ELEVATION, TOKEN_QUERY,
+        GetTokenInformation, TOKEN_ELEVATION, TOKEN_QUERY, TokenElevation,
     };
     use windows::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
 
@@ -99,7 +99,9 @@ pub fn self_elevate() -> bool {
         if wait_for_new_instance(5) {
             return true;
         }
-        tracing::warn!("Scheduled task claimed success but elevated process not detected, falling back to UAC");
+        tracing::warn!(
+            "Scheduled task claimed success but elevated process not detected, falling back to UAC"
+        );
     }
 
     // 回退到 UAC 弹窗提权
@@ -190,9 +192,9 @@ pub fn self_elevate() -> bool {
 fn elevate_with_uac() -> bool {
     use std::ffi::OsStr;
     use std::os::windows::ffi::OsStrExt;
-    use windows::core::PCWSTR;
     use windows::Win32::UI::Shell::ShellExecuteW;
     use windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
+    use windows::core::PCWSTR;
 
     let exe_path = match get_exe_path() {
         Ok(p) => p,
@@ -241,9 +243,9 @@ pub fn restart_app() -> bool {
 fn launch_via_explorer() -> bool {
     use std::ffi::OsStr;
     use std::os::windows::ffi::OsStrExt;
-    use windows::core::PCWSTR;
     use windows::Win32::UI::Shell::ShellExecuteW;
     use windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
+    use windows::core::PCWSTR;
 
     let exe_path = match get_exe_path() {
         Ok(p) => p,
@@ -276,8 +278,8 @@ fn launch_via_explorer() -> bool {
 /// 不存在时安全跳过
 #[cfg(target_os = "windows")]
 pub fn cleanup_compat_flags() {
-    use winreg::enums::*;
     use winreg::RegKey;
+    use winreg::enums::*;
 
     const COMPAT_LAYERS_PATH: &str =
         r"Software\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Layers";

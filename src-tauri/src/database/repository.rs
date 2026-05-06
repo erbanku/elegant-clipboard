@@ -1,7 +1,7 @@
 use super::{ContentType, Database};
 use crate::clipboard::semantic_hash_from_text;
 use parking_lot::Mutex;
-use rusqlite::{params, Connection, Row};
+use rusqlite::{Connection, Row, params};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tracing::debug;
@@ -134,7 +134,10 @@ struct ConditionBuilder {
 
 impl ConditionBuilder {
     fn new() -> Self {
-        Self { conditions: Vec::new(), params: Vec::new() }
+        Self {
+            conditions: Vec::new(),
+            params: Vec::new(),
+        }
     }
 
     /// Add non-pinned + non-favorite conditions (clearable items).
@@ -227,7 +230,10 @@ impl ConditionBuilder {
 
     /// COUNT(*) on clipboard_items.
     fn count_items(&self, conn: &Connection) -> Result<i64, rusqlite::Error> {
-        let sql = format!("SELECT COUNT(*) FROM clipboard_items{}", self.where_clause());
+        let sql = format!(
+            "SELECT COUNT(*) FROM clipboard_items{}",
+            self.where_clause()
+        );
         let refs = self.param_refs();
         conn.query_row(&sql, refs.as_slice(), |row| row.get(0))
     }
@@ -292,7 +298,11 @@ impl ClipboardRepository {
         Ok(id)
     }
 
-    pub fn exists_by_hash(&self, hash: &str, group_id: Option<i64>) -> Result<bool, rusqlite::Error> {
+    pub fn exists_by_hash(
+        &self,
+        hash: &str,
+        group_id: Option<i64>,
+    ) -> Result<bool, rusqlite::Error> {
         self.exists_by_column(HashColumn::Content, hash, group_id)
     }
 
@@ -334,7 +344,11 @@ impl ClipboardRepository {
     }
 
     /// 更新已有条目的访问时间并置顶
-    pub fn touch_by_hash(&self, hash: &str, group_id: Option<i64>) -> Result<Option<i64>, rusqlite::Error> {
+    pub fn touch_by_hash(
+        &self,
+        hash: &str,
+        group_id: Option<i64>,
+    ) -> Result<Option<i64>, rusqlite::Error> {
         self.touch_by_column(HashColumn::Content, hash, group_id)
     }
 
@@ -370,8 +384,7 @@ impl ClipboardRepository {
              WHERE {} = ? AND {} \
              ORDER BY sort_order DESC, created_at DESC, id DESC \
              LIMIT 1",
-            column,
-            group_cond
+            column, group_cond
         );
 
         let target_id: Result<i64, _> = if let Some(gid) = group_param {
@@ -420,7 +433,11 @@ impl ClipboardRepository {
     }
 
     /// 按默认排序位置获取完整条目（含文本内容），供快速粘贴使用。
-    pub fn get_by_position(&self, index: usize, group_id: Option<i64>) -> Result<Option<ClipboardItem>, rusqlite::Error> {
+    pub fn get_by_position(
+        &self,
+        index: usize,
+        group_id: Option<i64>,
+    ) -> Result<Option<ClipboardItem>, rusqlite::Error> {
         let conn = self.read_conn.lock();
         let (group_cond, group_param) = Self::group_condition(group_id);
         let sql = format!(
@@ -444,7 +461,11 @@ impl ClipboardRepository {
     }
 
     /// 按收藏列表位置获取完整条目，供收藏快速粘贴使用。
-    pub fn get_favorite_by_position(&self, index: usize, group_id: Option<i64>) -> Result<Option<ClipboardItem>, rusqlite::Error> {
+    pub fn get_favorite_by_position(
+        &self,
+        index: usize,
+        group_id: Option<i64>,
+    ) -> Result<Option<ClipboardItem>, rusqlite::Error> {
         let conn = self.read_conn.lock();
         let (group_cond, group_param) = Self::group_condition(group_id);
         let sql = format!(
@@ -468,15 +489,13 @@ impl ClipboardRepository {
     }
 
     /// 列表查询列（排除大文本字段以减少 IPC 传输）
-    const LIST_COLUMNS: &'static str =
-        "id, content_type, NULL AS text_content, NULL AS html_content, NULL AS rtf_content, \
+    const LIST_COLUMNS: &'static str = "id, content_type, NULL AS text_content, NULL AS html_content, NULL AS rtf_content, \
          image_path, file_paths, content_hash, semantic_hash, preview, byte_size, image_width, image_height, \
          is_pinned, is_favorite, favorite_order, sort_order, created_at, updated_at, access_count, last_accessed_at, char_count, \
          source_app_name, source_app_icon";
 
     /// 搜索查询列（含 text_content 用于关键词上下文预览）
-    const SEARCH_COLUMNS: &'static str =
-        "id, content_type, text_content, NULL AS html_content, NULL AS rtf_content, \
+    const SEARCH_COLUMNS: &'static str = "id, content_type, text_content, NULL AS html_content, NULL AS rtf_content, \
          image_path, file_paths, content_hash, semantic_hash, preview, byte_size, image_width, image_height, \
          is_pinned, is_favorite, favorite_order, sort_order, created_at, updated_at, access_count, last_accessed_at, char_count, \
          source_app_name, source_app_icon";
@@ -490,21 +509,21 @@ impl ClipboardRepository {
 
         // LIKE 搜索（支持中文，匹配全文任意位置）
         if let Some(ref search) = options.search
-            && !search.is_empty() {
-                conditions.push(
-                    "(text_content LIKE ? ESCAPE '\\' OR file_paths LIKE ? ESCAPE '\\')"
-                        .to_string(),
-                );
-                let pattern = format!(
-                    "%{}%",
-                    search
-                        .replace('\\', "\\\\")
-                        .replace('%', "\\%")
-                        .replace('_', "\\_")
-                );
-                params_vec.push(Box::new(pattern.clone()));
-                params_vec.push(Box::new(pattern));
-            }
+            && !search.is_empty()
+        {
+            conditions.push(
+                "(text_content LIKE ? ESCAPE '\\' OR file_paths LIKE ? ESCAPE '\\')".to_string(),
+            );
+            let pattern = format!(
+                "%{}%",
+                search
+                    .replace('\\', "\\\\")
+                    .replace('%', "\\%")
+                    .replace('_', "\\_")
+            );
+            params_vec.push(Box::new(pattern.clone()));
+            params_vec.push(Box::new(pattern));
+        }
 
         // 多类型筛选（逗号分隔）
         Self::append_content_type_condition(
@@ -535,7 +554,7 @@ impl ClipboardRepository {
     fn group_condition(group_id: Option<i64>) -> (&'static str, Option<i64>) {
         match group_id {
             Some(gid) => ("group_id = ?", Some(gid)),
-            None      => ("group_id IS NULL", None),
+            None => ("group_id IS NULL", None),
         }
     }
 
@@ -754,9 +773,8 @@ impl ClipboardRepository {
     /// 获取所有条目的图片路径（含置顶和收藏）
     pub fn get_all_image_paths(&self) -> Result<Vec<String>, rusqlite::Error> {
         let conn = self.read_conn.lock();
-        let mut stmt = conn.prepare(
-            "SELECT image_path FROM clipboard_items WHERE image_path IS NOT NULL",
-        )?;
+        let mut stmt =
+            conn.prepare("SELECT image_path FROM clipboard_items WHERE image_path IS NOT NULL")?;
         let paths = stmt
             .query_map([], |row| row.get::<_, String>(0))?
             .filter_map(|r| r.ok())
@@ -786,7 +804,11 @@ impl ClipboardRepository {
     }
 
     /// 删除 N 天前的非置顶/非收藏条目（按分组），返回 (删除数, 关联图片路径)
-    pub fn delete_older_than(&self, days: i64, group_id: Option<i64>) -> Result<(i64, Vec<String>), rusqlite::Error> {
+    pub fn delete_older_than(
+        &self,
+        days: i64,
+        group_id: Option<i64>,
+    ) -> Result<(i64, Vec<String>), rusqlite::Error> {
         let conn = self.write_conn.lock();
         let age_cond = "created_at < datetime('now', 'localtime', '-' || ? || ' days')";
 
@@ -803,12 +825,19 @@ impl ClipboardRepository {
             .condition_with_param(age_cond, days)
             .delete_items(&conn)?;
 
-        debug!("Auto-cleanup: deleted {} items older than {} days (group: {:?})", deleted, days, group_id);
+        debug!(
+            "Auto-cleanup: deleted {} items older than {} days (group: {:?})",
+            deleted, days, group_id
+        );
         Ok((deleted, image_paths))
     }
 
     /// 执行最大数量限制（按分组），返回 (删除数, 图片路径)
-    pub fn enforce_max_count(&self, max_count: i64, group_id: Option<i64>) -> Result<(i64, Vec<String>), rusqlite::Error> {
+    pub fn enforce_max_count(
+        &self,
+        max_count: i64,
+        group_id: Option<i64>,
+    ) -> Result<(i64, Vec<String>), rusqlite::Error> {
         if max_count <= 0 {
             return Ok((0, vec![]));
         }
@@ -848,7 +877,10 @@ impl ClipboardRepository {
         );
         let deleted = conn.execute(&delete_sql, del_cb.param_refs().as_slice())? as i64;
 
-        debug!("Enforced max count: deleted {} oldest items (group: {:?})", deleted, group_id);
+        debug!(
+            "Enforced max count: deleted {} oldest items (group: {:?})",
+            deleted, group_id
+        );
         Ok((deleted, image_paths))
     }
 
@@ -862,7 +894,8 @@ impl ClipboardRepository {
         hasher.update(b"text:");
         hasher.update(new_text.as_bytes());
         let content_hash = hasher.finalize().to_hex().to_string();
-        let semantic_hash = semantic_hash_from_text(new_text).unwrap_or_else(|| content_hash.clone());
+        let semantic_hash =
+            semantic_hash_from_text(new_text).unwrap_or_else(|| content_hash.clone());
 
         // 降级为 text 类型，清除 html/rtf 内容
         conn.execute(
@@ -880,7 +913,6 @@ impl ClipboardRepository {
     /// `is_pinned DESC, sort_order DESC`，置顶条目始终在前，
     /// 本条目将出现在所有非置顶条目的最前面。
     /// 已置顶的条目不作处理，避免打乱用户手动排列的置顶顺序。
-    /// 已收藏的条目同样不作处理，避免每次粘贴/复制重新排序收藏列表（issue #81）。
     pub fn bump_to_top(&self, id: i64) -> Result<(), rusqlite::Error> {
         let conn = self.write_conn.lock();
         let max_sort: i64 = conn
@@ -891,14 +923,13 @@ impl ClipboardRepository {
             )
             .unwrap_or(0);
         let affected = conn.execute(
-            "UPDATE clipboard_items SET sort_order = ?1 \
-             WHERE id = ?2 AND is_pinned = 0 AND is_favorite = 0",
+            "UPDATE clipboard_items SET sort_order = ?1 WHERE id = ?2 AND is_pinned = 0",
             params![max_sort + 1, id],
         )?;
         if affected > 0 {
             debug!("Bumped item {} to top (sort_order: {})", id, max_sort + 1);
         } else {
-            debug!("Skipped bump for item {} (pinned, favorite, or not found)", id);
+            debug!("Skipped bump for item {} (pinned or not found)", id);
         }
         Ok(())
     }
@@ -943,7 +974,11 @@ impl ClipboardRepository {
     }
 
     /// 交换两个收藏条目的排序位置
-    pub fn move_favorite_item_by_id(&self, from_id: i64, to_id: i64) -> Result<(), rusqlite::Error> {
+    pub fn move_favorite_item_by_id(
+        &self,
+        from_id: i64,
+        to_id: i64,
+    ) -> Result<(), rusqlite::Error> {
         let conn = self.write_conn.lock();
 
         let from_favorite_order: i64 = conn.query_row(
@@ -1182,7 +1217,11 @@ impl GroupRepository {
     }
 
     /// 将条目移动到指定分组（None = 移回默认分组）
-    pub fn move_item_to_group(&self, item_id: i64, group_id: Option<i64>) -> Result<(), rusqlite::Error> {
+    pub fn move_item_to_group(
+        &self,
+        item_id: i64,
+        group_id: Option<i64>,
+    ) -> Result<(), rusqlite::Error> {
         let conn = self.write_conn.lock();
         conn.execute(
             "UPDATE clipboard_items SET group_id = ?1 WHERE id = ?2",

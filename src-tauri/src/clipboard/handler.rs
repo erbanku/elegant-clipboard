@@ -86,14 +86,8 @@ fn truncate_content(content: String, max_size: usize, content_type: &str) -> Str
 #[derive(Debug, Clone)]
 pub enum ClipboardContent {
     Text(String),
-    Html {
-        html: String,
-        text: Option<String>,
-    },
-    Rtf {
-        rtf: String,
-        text: Option<String>,
-    },
+    Html { html: String, text: Option<String> },
+    Rtf { rtf: String, text: Option<String> },
     Image(Vec<u8>),
     Files(Vec<String>),
 }
@@ -197,11 +191,7 @@ impl ClipboardHandler {
         }
     }
     pub fn is_content_type_allowed(&self, content: &ClipboardContent) -> bool {
-        let allowed = self
-            .settings_repo
-            .get("monitor_types")
-            .ok()
-            .flatten();
+        let allowed = self.settings_repo.get("monitor_types").ok().flatten();
 
         // 无设置或空字符串 → 全部允许
         let allowed = match allowed {
@@ -227,7 +217,10 @@ impl ClipboardHandler {
     ///   - `app_filter_list`: 逗号分隔的规则列表，支持通配符 * 和 ?
     ///
     /// 黑名单模式：匹配则排除；白名单模式：不匹配则排除
-    pub fn is_source_app_excluded(&self, source: &Option<super::source_app::SourceAppInfo>) -> bool {
+    pub fn is_source_app_excluded(
+        &self,
+        source: &Option<super::source_app::SourceAppInfo>,
+    ) -> bool {
         let source = match source {
             Some(s) => s,
             None => return false,
@@ -245,11 +238,7 @@ impl ClipboardHandler {
             return false;
         }
 
-        let filter_list = self
-            .settings_repo
-            .get("app_filter_list")
-            .ok()
-            .flatten();
+        let filter_list = self.settings_repo.get("app_filter_list").ok().flatten();
 
         let filter_list = match filter_list {
             Some(ref s) if !s.is_empty() => s,
@@ -271,7 +260,9 @@ impl ClipboardHandler {
 
         let matches = filter_list.split(',').any(|entry| {
             let entry = entry.trim();
-            if entry.is_empty() { return false; }
+            if entry.is_empty() {
+                return false;
+            }
             matches_app_filter(entry, &source.app_name, exe_name, &source.exe_path)
         });
 
@@ -327,13 +318,15 @@ impl ClipboardHandler {
         if dedup != "always_new"
             && if text_like {
                 if text_use_strict {
-                    self.repository.exists_by_hash(&hashes.content_hash, group_id)
+                    self.repository
+                        .exists_by_hash(&hashes.content_hash, group_id)
                 } else {
                     self.repository
                         .exists_by_semantic_hash(&hashes.semantic_hash, group_id)
                 }
             } else {
-                self.repository.exists_by_hash(&hashes.content_hash, group_id)
+                self.repository
+                    .exists_by_hash(&hashes.content_hash, group_id)
             }
             .map_err(|e| e.to_string())?
         {
@@ -394,7 +387,10 @@ impl ClipboardHandler {
 
         let log_type = format!("{:?}", item.content_type);
         let log_size = item.byte_size;
-        let log_source = item.source_app_name.clone().unwrap_or_else(|| "unknown".to_string());
+        let log_source = item
+            .source_app_name
+            .clone()
+            .unwrap_or_else(|| "unknown".to_string());
 
         let id = self.repository.insert(item).map_err(|e| e.to_string())?;
         info!(
@@ -405,7 +401,10 @@ impl ClipboardHandler {
         // 执行最大历史数限制，清理旧图片
         let max_history_count = self.get_max_history_count();
         if max_history_count > 0 {
-            match self.repository.enforce_max_count(max_history_count, group_id) {
+            match self
+                .repository
+                .enforce_max_count(max_history_count, group_id)
+            {
                 Ok((deleted, image_paths)) => {
                     super::cleanup_image_files(&image_paths);
                     if deleted > 0 {
@@ -419,11 +418,17 @@ impl ClipboardHandler {
         // 自动清理超过指定天数的旧记录
         let auto_cleanup_days = self.get_auto_cleanup_days();
         if auto_cleanup_days > 0 {
-            match self.repository.delete_older_than(auto_cleanup_days, group_id) {
+            match self
+                .repository
+                .delete_older_than(auto_cleanup_days, group_id)
+            {
                 Ok((deleted, image_paths)) => {
                     super::cleanup_image_files(&image_paths);
                     if deleted > 0 {
-                        info!("Auto-cleanup: removed {} items older than {} days", deleted, auto_cleanup_days);
+                        info!(
+                            "Auto-cleanup: removed {} items older than {} days",
+                            deleted, auto_cleanup_days
+                        );
                     }
                 }
                 Err(e) => warn!("Failed to auto-cleanup old items: {}", e),
@@ -446,7 +451,9 @@ impl ClipboardHandler {
     fn is_text_like_content(content: &ClipboardContent) -> bool {
         matches!(
             content,
-            ClipboardContent::Text(_) | ClipboardContent::Html { .. } | ClipboardContent::Rtf { .. }
+            ClipboardContent::Text(_)
+                | ClipboardContent::Html { .. }
+                | ClipboardContent::Rtf { .. }
         )
     }
 
@@ -586,7 +593,11 @@ impl ClipboardHandler {
     }
 
     /// 处理图片内容：保存到磁盘并提取宽高元数据
-    fn process_image(&self, data: Vec<u8>, hashes: &ContentHashes) -> Result<NewClipboardItem, String> {
+    fn process_image(
+        &self,
+        data: Vec<u8>,
+        hashes: &ContentHashes,
+    ) -> Result<NewClipboardItem, String> {
         let byte_size = data.len() as i64;
 
         let filename = format!("{}.png", &hashes.content_hash[..16]);
@@ -631,7 +642,11 @@ impl ClipboardHandler {
         Ok((w as i64, h as i64))
     }
 
-    fn process_files(&self, files: Vec<String>, hashes: &ContentHashes) -> Result<NewClipboardItem, String> {
+    fn process_files(
+        &self,
+        files: Vec<String>,
+        hashes: &ContentHashes,
+    ) -> Result<NewClipboardItem, String> {
         use std::path::Path;
         debug!("Processing {} file(s)", files.len());
 

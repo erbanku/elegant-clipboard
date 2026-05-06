@@ -26,8 +26,7 @@ use windows::Win32::Foundation::*;
 use windows::Win32::System::Threading::GetCurrentThreadId;
 #[cfg(windows)]
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    GetAsyncKeyState, VK_DELETE, VK_DOWN, VK_ESCAPE, VK_LEFT, VK_RETURN, VK_RIGHT, VK_SHIFT,
-    VK_UP,
+    GetAsyncKeyState, VK_DELETE, VK_DOWN, VK_ESCAPE, VK_LEFT, VK_RETURN, VK_RIGHT, VK_SHIFT, VK_UP,
 };
 #[cfg(windows)]
 use windows::Win32::UI::WindowsAndMessaging::*;
@@ -87,7 +86,15 @@ unsafe extern "system" fn wndproc_subclass(
     if original == 0 {
         return unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) };
     }
-    unsafe { CallWindowProcW(Some(std::mem::transmute(original)), hwnd, msg, wparam, lparam) }
+    unsafe {
+        CallWindowProcW(
+            Some(std::mem::transmute(original)),
+            hwnd,
+            msg,
+            wparam,
+            lparam,
+        )
+    }
 }
 
 pub fn init(window: WebviewWindow) {
@@ -256,7 +263,8 @@ fn run_hook_thread() {
 
     HOOK_THREAD_ID.store(unsafe { GetCurrentThreadId() }, Ordering::SeqCst);
     if KEYBOARD_HOOK_DESIRED.load(Ordering::SeqCst) {
-        let kb_hook = unsafe { SetWindowsHookExW(WH_KEYBOARD_LL, Some(keyboard_hook_proc), None, 0) };
+        let kb_hook =
+            unsafe { SetWindowsHookExW(WH_KEYBOARD_LL, Some(keyboard_hook_proc), None, 0) };
         match kb_hook {
             Ok(hook) => {
                 TL_KEYBOARD_HOOK.with(|h| *h.borrow_mut() = Some(hook));
@@ -289,7 +297,9 @@ fn run_hook_thread() {
             MSG_UNINSTALL_KB_HOOK => {
                 TL_KEYBOARD_HOOK.with(|h| {
                     if let Some(hook) = h.borrow_mut().take() {
-                        unsafe { let _ = UnhookWindowsHookEx(hook); }
+                        unsafe {
+                            let _ = UnhookWindowsHookEx(hook);
+                        }
                     }
                 });
             }
@@ -303,7 +313,9 @@ fn run_hook_thread() {
     for cleanup in [&TL_MOUSE_HOOK, &TL_KEYBOARD_HOOK] {
         cleanup.with(|h| {
             if let Some(hook) = h.borrow_mut().take() {
-                unsafe { let _ = UnhookWindowsHookEx(hook); }
+                unsafe {
+                    let _ = UnhookWindowsHookEx(hook);
+                }
             }
         });
     }
@@ -316,10 +328,11 @@ unsafe extern "system" fn mouse_hook_proc(code: i32, wparam: WPARAM, lparam: LPA
         match wparam.0 as u32 {
             v if v == WM_MOUSEMOVE => {
                 if MOUSE_MONITORING_ENABLED.load(Ordering::Relaxed)
-                    && let Some(info) = unsafe { (lparam.0 as *const MSLLHOOKSTRUCT).as_ref() } {
-                        CURSOR_X.store(info.pt.x as i64, Ordering::Relaxed);
-                        CURSOR_Y.store(info.pt.y as i64, Ordering::Relaxed);
-                    }
+                    && let Some(info) = unsafe { (lparam.0 as *const MSLLHOOKSTRUCT).as_ref() }
+                {
+                    CURSOR_X.store(info.pt.x as i64, Ordering::Relaxed);
+                    CURSOR_Y.store(info.pt.y as i64, Ordering::Relaxed);
+                }
             }
             v if v == WM_LBUTTONDOWN || v == WM_RBUTTONDOWN => {
                 // 用点击坐标更新光标位置，确保边界检查精确
@@ -336,11 +349,7 @@ unsafe extern "system" fn mouse_hook_proc(code: i32, wparam: WPARAM, lparam: LPA
 }
 
 #[cfg(windows)]
-unsafe extern "system" fn keyboard_hook_proc(
-    code: i32,
-    wparam: WPARAM,
-    lparam: LPARAM,
-) -> LRESULT {
+unsafe extern "system" fn keyboard_hook_proc(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     if code >= 0 {
         let msg = wparam.0 as u32;
         let is_keydown = msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN;
@@ -382,13 +391,17 @@ unsafe extern "system" fn keyboard_hook_proc(
 #[cfg(windows)]
 fn handle_nav_key(key: &str) {
     if let Some(window) = MAIN_WINDOW.lock().as_ref()
-        && window.is_visible().unwrap_or(false) {
-            let shift = unsafe { GetAsyncKeyState(VK_SHIFT.0 as i32) < 0 };
-            let _ = window.emit("keyboard-nav", serde_json::json!({
+        && window.is_visible().unwrap_or(false)
+    {
+        let shift = unsafe { GetAsyncKeyState(VK_SHIFT.0 as i32) < 0 };
+        let _ = window.emit(
+            "keyboard-nav",
+            serde_json::json!({
                 "key": key,
                 "shift": shift,
-            }));
-        }
+            }),
+        );
+    }
 }
 
 #[cfg(windows)]
@@ -410,7 +423,12 @@ fn is_mouse_outside_window(_window: &WebviewWindow) -> bool {
     let outside = cx < rect.left || cx > rect.right || cy < rect.top || cy > rect.bottom;
     debug!(
         "点击检测: cursor=({},{}) rect=({},{},{},{}) → {}",
-        cx, cy, rect.left, rect.top, rect.right, rect.bottom,
+        cx,
+        cy,
+        rect.left,
+        rect.top,
+        rect.right,
+        rect.bottom,
         if outside { "outside" } else { "inside" }
     );
     outside
@@ -447,9 +465,10 @@ fn handle_escape_key() {
         return;
     }
     if let Some(window) = MAIN_WINDOW.lock().as_ref()
-        && window.is_visible().unwrap_or(false) {
-            let _ = window.emit("escape-pressed", ());
-        }
+        && window.is_visible().unwrap_or(false)
+    {
+        let _ = window.emit("escape-pressed", ());
+    }
 }
 
 fn handle_click_outside() {
@@ -463,14 +482,16 @@ fn handle_click_outside() {
         return;
     }
     if let Some(window) = MAIN_WINDOW.lock().as_ref()
-        && window.is_visible().unwrap_or(false) && is_mouse_outside_window(window) {
-            info!("handle_click_outside: window visible and click outside, hiding");
-            crate::commands::window::save_window_size_if_enabled(window.app_handle(), window);
-            let _ = window.set_focusable(false);
-            let _ = window.hide();
-            crate::keyboard_hook::set_window_state(crate::keyboard_hook::WindowState::Hidden);
-            disable_mouse_monitoring();
-            crate::commands::hide_preview_windows(window.app_handle());
-            let _ = window.emit("window-hidden", ());
-        }
+        && window.is_visible().unwrap_or(false)
+        && is_mouse_outside_window(window)
+    {
+        info!("handle_click_outside: window visible and click outside, hiding");
+        crate::commands::window::save_window_size_if_enabled(window.app_handle(), window);
+        let _ = window.set_focusable(false);
+        let _ = window.hide();
+        crate::keyboard_hook::set_window_state(crate::keyboard_hook::WindowState::Hidden);
+        disable_mouse_monitoring();
+        crate::commands::hide_preview_windows(window.app_handle());
+        let _ = window.emit("window-hidden", ());
+    }
 }

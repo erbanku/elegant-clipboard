@@ -51,8 +51,8 @@ fn build_agent() -> ureq::Agent {
 /// 从 Windows 注册表读取系统代理设置
 #[cfg(target_os = "windows")]
 fn read_system_proxy() -> Option<ureq::Proxy> {
-    use winreg::enums::HKEY_CURRENT_USER;
     use winreg::RegKey;
+    use winreg::enums::HKEY_CURRENT_USER;
 
     let inet = RegKey::predef(HKEY_CURRENT_USER)
         .open_subkey("Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings")
@@ -69,27 +69,27 @@ fn read_system_proxy() -> Option<ureq::Proxy> {
     // 格式可能是 "host:port" 或 "http=h:p;https=h:p;..."
     let addr = if server.contains('=') {
         // 提取 https 或 http 代理
-        server
-            .split(';')
-            .find_map(|seg| {
-                let seg = seg.trim();
-                if seg.starts_with("https=") {
-                    Some(seg.trim_start_matches("https=").to_string())
-                } else if seg.starts_with("http=") {
-                    Some(seg.trim_start_matches("http=").to_string())
-                } else {
-                    None
-                }
-            })?
+        server.split(';').find_map(|seg| {
+            let seg = seg.trim();
+            if seg.starts_with("https=") {
+                Some(seg.trim_start_matches("https=").to_string())
+            } else if seg.starts_with("http=") {
+                Some(seg.trim_start_matches("http=").to_string())
+            } else {
+                None
+            }
+        })?
     } else {
         server
     };
 
-    let url = if addr.starts_with("http://") || addr.starts_with("https://") || addr.starts_with("socks") {
-        addr
-    } else {
-        format!("http://{}", addr)
-    };
+    let url =
+        if addr.starts_with("http://") || addr.starts_with("https://") || addr.starts_with("socks")
+        {
+            addr
+        } else {
+            format!("http://{}", addr)
+        };
 
     debug!("System proxy address: {}", url);
     ureq::Proxy::new(&url).ok()
@@ -146,9 +146,10 @@ pub fn check_update() -> Result<UpdateInfo, String> {
         .header("User-Agent", "ElegantClipboard");
 
     if let Some(token) = GITHUB_TOKEN
-        && !token.is_empty() {
-            req = req.header("Authorization", &format!("Bearer {}", token));
-        }
+        && !token.is_empty()
+    {
+        req = req.header("Authorization", &format!("Bearer {}", token));
+    }
 
     // GitHub 列表已按发布时间倒序
     let releases: Vec<GitHubRelease> = match req.call() {
@@ -157,7 +158,7 @@ pub fn check_update() -> Result<UpdateInfo, String> {
             .read_json()
             .map_err(|e| format!("解析响应失败: {}", e))?,
         Err(ureq::Error::StatusCode(403)) => {
-            return Err("GitHub API 请求限额已用尽，请稍后再试".into())
+            return Err("GitHub API 请求限额已用尽，请稍后再试".into());
         }
         Err(ureq::Error::StatusCode(404)) => return Err("未找到发布版本".into()),
         Err(ureq::Error::StatusCode(code)) => return Err(format!("GitHub API 返回错误: {}", code)),
@@ -252,7 +253,7 @@ pub fn download(app: &tauri::AppHandle, url: &str, file_name: &str) -> Result<St
     {
         Ok(resp) => resp,
         Err(ureq::Error::StatusCode(code)) => {
-            return Err(format!("下载服务器返回错误 (HTTP {})", code))
+            return Err(format!("下载服务器返回错误 (HTTP {})", code));
         }
         Err(_) => return Err("网络连接失败，请检查网络后重试".into()),
     };
@@ -316,7 +317,10 @@ pub fn download(app: &tauri::AppHandle, url: &str, file_name: &str) -> Result<St
 ///
 /// 完全静默可改用 `/S`；此处选 `/P` 是为了让用户能看到更新进度反馈。
 pub fn install(installer_path: &str) -> Result<(), String> {
-    info!("Launching installer (passive + restart): {}", installer_path);
+    info!(
+        "Launching installer (passive + restart): {}",
+        installer_path
+    );
 
     std::process::Command::new(installer_path)
         .args(["/P", "/R"])

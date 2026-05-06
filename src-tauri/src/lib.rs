@@ -30,7 +30,11 @@ use tracing_subscriber::util::SubscriberInitExt;
 struct LocalTimer;
 impl tracing_subscriber::fmt::time::FormatTime for LocalTimer {
     fn format_time(&self, w: &mut tracing_subscriber::fmt::format::Writer<'_>) -> std::fmt::Result {
-        write!(w, "{}", chrono::Local::now().format("%Y-%m-%d %H:%M:%S%.3f"))
+        write!(
+            w,
+            "{}",
+            chrono::Local::now().format("%Y-%m-%d %H:%M:%S%.3f")
+        )
     }
 }
 static CURRENT_SHORTCUT: parking_lot::RwLock<Option<String>> = parking_lot::RwLock::new(None);
@@ -46,7 +50,8 @@ static ACTIVE_FAVORITE_PASTE_SLOTS: std::sync::LazyLock<parking_lot::Mutex<HashS
 /// simulate_paste 释放修饰键时可能导致 OS 重新触发快捷键，用此标志拦截假触发
 static PASTE_IN_PROGRESS: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 /// 快捷键是否已被用户临时禁用（Win+V 除外）
-static SHORTCUTS_DISABLED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+static SHORTCUTS_DISABLED: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
 
 #[derive(Clone, Copy)]
 enum PasteKind {
@@ -78,20 +83,27 @@ impl PasteKind {
             PasteKind::Quick => CURRENT_QUICK_PASTE_SHORTCUTS.read().clone(),
             PasteKind::Favorite => CURRENT_FAVORITE_PASTE_SHORTCUTS.read().clone(),
         };
-        if current.len() == 10 { current } else { self.defaults() }
+        if current.len() == 10 {
+            current
+        } else {
+            self.defaults()
+        }
     }
 }
 
 /// 注销一组快捷键（含小键盘变体）
 fn unregister_shortcut_list(app: &tauri::AppHandle, list: &[String]) {
     for s in list {
-        if s.is_empty() { continue; }
+        if s.is_empty() {
+            continue;
+        }
         if let Some(sc) = parse_shortcut(s) {
             let _ = app.global_shortcut().unregister(sc);
         }
         if let Some(numpad_str) = numpad_variant_str(s)
-            && let Some(numpad_sc) = parse_shortcut(&numpad_str) {
-                let _ = app.global_shortcut().unregister(numpad_sc);
+            && let Some(numpad_sc) = parse_shortcut(&numpad_str)
+        {
+            let _ = app.global_shortcut().unregister(numpad_sc);
         }
     }
 }
@@ -110,11 +122,13 @@ pub fn toggle_shortcuts_disabled(app: &tauri::AppHandle) -> bool {
         tracing::info!("All shortcuts disabled (except Win+V)");
     } else {
         if let Some(sc) = parse_shortcut(&get_current_shortcut()) {
-            let _ = app.global_shortcut().on_shortcut(sc, |app, _shortcut, event| {
-                if event.state == ShortcutState::Pressed {
-                    commands::window::toggle_window_visibility(app);
-                }
-            });
+            let _ = app
+                .global_shortcut()
+                .on_shortcut(sc, |app, _shortcut, event| {
+                    if event.state == ShortcutState::Pressed {
+                        commands::window::toggle_window_visibility(app);
+                    }
+                });
         }
         let shortcuts = CURRENT_QUICK_PASTE_SHORTCUTS.read().clone();
         apply_paste_shortcuts(app, &shortcuts, PasteKind::Quick);
@@ -143,7 +157,12 @@ fn shortcut_has_modifier(shortcut: &str) -> bool {
     shortcut
         .split('+')
         .map(|part| part.trim().to_uppercase())
-        .any(|part| matches!(part.as_str(), "CTRL" | "CONTROL" | "ALT" | "WIN" | "SUPER" | "META" | "CMD"))
+        .any(|part| {
+            matches!(
+                part.as_str(),
+                "CTRL" | "CONTROL" | "ALT" | "WIN" | "SUPER" | "META" | "CMD"
+            )
+        })
 }
 
 fn load_quick_paste_shortcuts(repo: &SettingsRepository) -> Vec<String> {
@@ -226,20 +245,30 @@ fn apply_paste_shortcuts(
         let parsed = match parse_shortcut(&normalized) {
             Some(v) => v,
             None => {
-                failures.insert(slot, format!("{} {} 快捷键格式无效: {}", label, slot, normalized));
+                failures.insert(
+                    slot,
+                    format!("{} {} 快捷键格式无效: {}", label, slot, normalized),
+                );
                 continue;
             }
         };
 
         let make_handler = |slot: u8, kind: PasteKind| {
-            move |app: &tauri::AppHandle, _shortcut: &Shortcut, event: tauri_plugin_global_shortcut::ShortcutEvent| match event.state {
+            move |app: &tauri::AppHandle,
+                  _shortcut: &Shortcut,
+                  event: tauri_plugin_global_shortcut::ShortcutEvent| match event.state
+            {
                 ShortcutState::Pressed => {
                     let any_focused = app
                         .webview_windows()
                         .values()
                         .any(|w| w.is_focused().unwrap_or(false));
-                    if any_focused { return; }
-                    if PASTE_IN_PROGRESS.load(std::sync::atomic::Ordering::Acquire) { return; }
+                    if any_focused {
+                        return;
+                    }
+                    if PASTE_IN_PROGRESS.load(std::sync::atomic::Ordering::Acquire) {
+                        return;
+                    }
                     let active_slots = match kind {
                         PasteKind::Quick => &*ACTIVE_QUICK_PASTE_SLOTS,
                         PasteKind::Favorite => &*ACTIVE_FAVORITE_PASTE_SLOTS,
@@ -252,8 +281,18 @@ fn apply_paste_shortcuts(
                         PASTE_IN_PROGRESS.store(true, std::sync::atomic::Ordering::Release);
                         if is_first {
                             let result = match kind {
-                                PasteKind::Quick => commands::clipboard::quick_paste_by_slot(&state, &app_handle, slot),
-                                PasteKind::Favorite => commands::clipboard::quick_paste_favorite_by_slot(&state, &app_handle, slot),
+                                PasteKind::Quick => commands::clipboard::quick_paste_by_slot(
+                                    &state,
+                                    &app_handle,
+                                    slot,
+                                ),
+                                PasteKind::Favorite => {
+                                    commands::clipboard::quick_paste_favorite_by_slot(
+                                        &state,
+                                        &app_handle,
+                                        slot,
+                                    )
+                                }
                             };
                             if let Err(err) = result {
                                 tracing::warn!("{} {} paste failed: {}", kind.label(), slot, err);
@@ -262,7 +301,12 @@ fn apply_paste_shortcuts(
                         } else {
                             std::thread::sleep(std::time::Duration::from_millis(50));
                             if let Err(err) = commands::clipboard::simulate_paste() {
-                                tracing::warn!("{} {} repeat paste failed: {}", kind.label(), slot, err);
+                                tracing::warn!(
+                                    "{} {} repeat paste failed: {}",
+                                    kind.label(),
+                                    slot,
+                                    err
+                                );
                             }
                         }
                         PASTE_IN_PROGRESS.store(false, std::sync::atomic::Ordering::Release);
@@ -277,15 +321,23 @@ fn apply_paste_shortcuts(
             }
         };
 
-        let reg_result = app.global_shortcut().on_shortcut(parsed, make_handler(slot, kind));
+        let reg_result = app
+            .global_shortcut()
+            .on_shortcut(parsed, make_handler(slot, kind));
         if let Err(err) = reg_result {
-            failures.insert(slot, format!("{} {} 注册失败（{}）: {}", label, slot, normalized, err));
+            failures.insert(
+                slot,
+                format!("{} {} 注册失败（{}）: {}", label, slot, normalized, err),
+            );
         }
 
         // 自动为数字键注册小键盘变体
         if let Some(numpad_str) = numpad_variant_str(&normalized)
-            && let Some(numpad_sc) = parse_shortcut(&numpad_str) {
-                let _ = app.global_shortcut().on_shortcut(numpad_sc, make_handler(slot, kind));
+            && let Some(numpad_sc) = parse_shortcut(&numpad_str)
+        {
+            let _ = app
+                .global_shortcut()
+                .on_shortcut(numpad_sc, make_handler(slot, kind));
         }
     }
 
@@ -301,10 +353,11 @@ static FILE_LOG_GUARD: parking_lot::Mutex<Option<tracing_appender::non_blocking:
 
 fn rotate_log_if_needed(log_path: &std::path::Path, max_size: u64) {
     if let Ok(meta) = std::fs::metadata(log_path)
-        && meta.len() > max_size {
-            let backup = log_path.with_extension("log.old");
-            let _ = std::fs::rename(log_path, backup);
-        }
+        && meta.len() > max_size
+    {
+        let backup = log_path.with_extension("log.old");
+        let _ = std::fs::rename(log_path, backup);
+    }
 }
 
 fn init_logging(config: &AppConfig) {
@@ -351,7 +404,9 @@ fn init_logging(config: &AppConfig) {
     };
 
     tracing_subscriber::registry()
-        .with(tracing_subscriber::filter::LevelFilter::from_level(Level::INFO))
+        .with(tracing_subscriber::filter::LevelFilter::from_level(
+            Level::INFO,
+        ))
         .with(stdout_layer)
         .with(file_layer)
         .init();
@@ -369,9 +424,15 @@ fn migrate_legacy_settings(repo: &SettingsRepository) {
             continue;
         }
         if let Ok(Some(value)) = repo.get(old_key)
-            && let Err(err) = repo.set(new_key, &value) {
-                tracing::warn!("Failed to migrate setting '{}' -> '{}': {}", old_key, new_key, err);
-            }
+            && let Err(err) = repo.set(new_key, &value)
+        {
+            tracing::warn!(
+                "Failed to migrate setting '{}' -> '{}': {}",
+                old_key,
+                new_key,
+                err
+            );
+        }
     }
 }
 
@@ -386,16 +447,19 @@ async fn enable_winv_replacement(app: tauri::AppHandle) -> Result<(), String> {
 
     if let Err(e) = win_v_registry::disable_win_v_hotkey(true) {
         if let Some(sc) = saved_shortcut {
-            let _ = app.global_shortcut().on_shortcut(sc, |app, _shortcut, event| {
-                if event.state == ShortcutState::Pressed {
-                    commands::window::toggle_window_visibility(app);
-                }
-            });
+            let _ = app
+                .global_shortcut()
+                .on_shortcut(sc, |app, _shortcut, event| {
+                    if event.state == ShortcutState::Pressed {
+                        commands::window::toggle_window_visibility(app);
+                    }
+                });
         }
         return Err(e);
     }
     let winv_shortcut = Shortcut::new(Some(Modifiers::SUPER), Code::KeyV);
-    if let Err(e) = app.global_shortcut()
+    if let Err(e) = app
+        .global_shortcut()
         .on_shortcut(winv_shortcut, |app, _shortcut, event| {
             if event.state == ShortcutState::Pressed {
                 commands::window::toggle_window_visibility(app);
@@ -404,11 +468,13 @@ async fn enable_winv_replacement(app: tauri::AppHandle) -> Result<(), String> {
     {
         let _ = win_v_registry::enable_win_v_hotkey(true);
         if let Some(sc) = saved_shortcut {
-            let _ = app.global_shortcut().on_shortcut(sc, |app, _shortcut, event| {
-                if event.state == ShortcutState::Pressed {
-                    commands::window::toggle_window_visibility(app);
-                }
-            });
+            let _ = app
+                .global_shortcut()
+                .on_shortcut(sc, |app, _shortcut, event| {
+                    if event.state == ShortcutState::Pressed {
+                        commands::window::toggle_window_visibility(app);
+                    }
+                });
         }
         return Err(format!("Failed to register Win+V shortcut: {}", e));
     }
@@ -481,7 +547,10 @@ fn get_current_shortcut() -> String {
         .unwrap_or_else(|| "Alt+C".to_string())
 }
 
-fn reload_paste_shortcuts_from_settings(app: &tauri::AppHandle, kind: PasteKind) -> HashMap<u8, String> {
+fn reload_paste_shortcuts_from_settings(
+    app: &tauri::AppHandle,
+    kind: PasteKind,
+) -> HashMap<u8, String> {
     let state = app.state::<Arc<AppState>>();
     let settings_repo = SettingsRepository::new(&state.db);
     let shortcuts = match kind {
@@ -504,7 +573,10 @@ fn set_paste_shortcut_inner(
     let normalized = normalize_shortcut_value(&shortcut);
     if !normalized.is_empty() {
         let upper = normalized.to_uppercase();
-        if upper.split('+').any(|p| matches!(p.trim(), "WIN" | "SUPER" | "META" | "CMD")) {
+        if upper
+            .split('+')
+            .any(|p| matches!(p.trim(), "WIN" | "SUPER" | "META" | "CMD"))
+        {
             return Err("快速粘贴不支持 Win 修饰键（Win+数字 是系统任务栏快捷键）".to_string());
         }
         let parsed = parse_shortcut(&normalized)
@@ -514,9 +586,10 @@ fn set_paste_shortcut_inner(
         }
         let main_sc = get_current_shortcut();
         if let Some(main_parsed) = parse_shortcut(&main_sc)
-            && parsed == main_parsed {
-                return Err(format!("与呼出快捷键 {} 冲突", main_sc));
-            }
+            && parsed == main_parsed
+        {
+            return Err(format!("与呼出快捷键 {} 冲突", main_sc));
+        }
     }
 
     let mut next_shortcuts = kind.read_current();
@@ -546,7 +619,11 @@ fn get_quick_paste_shortcuts() -> Vec<String> {
 }
 
 #[tauri::command]
-fn set_quick_paste_shortcut(app: tauri::AppHandle, slot: u8, shortcut: String) -> Result<(), String> {
+fn set_quick_paste_shortcut(
+    app: tauri::AppHandle,
+    slot: u8,
+    shortcut: String,
+) -> Result<(), String> {
     set_paste_shortcut_inner(&app, slot, shortcut, PasteKind::Quick)
 }
 
@@ -556,7 +633,11 @@ fn get_favorite_paste_shortcuts() -> Vec<String> {
 }
 
 #[tauri::command]
-fn set_favorite_paste_shortcut(app: tauri::AppHandle, slot: u8, shortcut: String) -> Result<(), String> {
+fn set_favorite_paste_shortcut(
+    app: tauri::AppHandle,
+    slot: u8,
+    shortcut: String,
+) -> Result<(), String> {
     set_paste_shortcut_inner(&app, slot, shortcut, PasteKind::Favorite)
 }
 
@@ -615,7 +696,11 @@ pub fn run() {
             monitor.init(&db, images_path);
 
             let active_group_id = monitor.active_group_id();
-            let state = Arc::new(AppState { db, monitor, active_group_id });
+            let state = Arc::new(AppState {
+                db,
+                monitor,
+                active_group_id,
+            });
 
             let settings_repo = database::SettingsRepository::new(&state.db);
             migrate_legacy_settings(&settings_repo);
@@ -674,17 +759,32 @@ pub fn run() {
             for kind in [PasteKind::Quick, PasteKind::Favorite] {
                 let failures = reload_paste_shortcuts_from_settings(app.handle(), kind);
                 for (slot, err) in &failures {
-                    tracing::warn!("{} {} shortcut registration failed: {}", kind.label(), slot, err);
+                    tracing::warn!(
+                        "{} {} shortcut registration failed: {}",
+                        kind.label(),
+                        slot,
+                        err
+                    );
                 }
             }
 
             if let Some(window) = app.get_webview_window("main") {
-                let persist = settings_repo.get("persist_window_size").ok().flatten()
-                    .map(|v| v != "false").unwrap_or(true);
+                let persist = settings_repo
+                    .get("persist_window_size")
+                    .ok()
+                    .flatten()
+                    .map(|v| v != "false")
+                    .unwrap_or(true);
                 if persist {
-                    let custom_width = settings_repo.get("window_width").ok().flatten()
+                    let custom_width = settings_repo
+                        .get("window_width")
+                        .ok()
+                        .flatten()
                         .and_then(|v| v.parse::<f64>().ok());
-                    let custom_height = settings_repo.get("window_height").ok().flatten()
+                    let custom_height = settings_repo
+                        .get("window_height")
+                        .ok()
+                        .flatten()
                         .and_then(|v| v.parse::<f64>().ok());
                     if let (Some(w), Some(h)) = (custom_width, custom_height) {
                         let _ = window.set_size(tauri::Size::Logical(tauri::LogicalSize {
@@ -726,10 +826,9 @@ pub fn run() {
                     {
                         use windows::Win32::Foundation::HWND;
                         use windows::Win32::UI::WindowsAndMessaging::{
-                            GetWindowLongW, SetWindowLongW, SetWindowPos,
-                            GWL_EXSTYLE, WS_EX_LAYERED,
-                            SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE,
-                            SWP_NOSIZE, SWP_NOZORDER,
+                            GWL_EXSTYLE, GetWindowLongW, SWP_FRAMECHANGED, SWP_NOACTIVATE,
+                            SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SetWindowLongW, SetWindowPos,
+                            WS_EX_LAYERED,
                         };
                         if let Ok(raw_hwnd) = window.hwnd() {
                             let hwnd = HWND(raw_hwnd.0 as *mut _);
@@ -737,22 +836,30 @@ pub fn run() {
                                 let ex_style = GetWindowLongW(hwnd, GWL_EXSTYLE);
                                 if (ex_style as u32) & WS_EX_LAYERED.0 == 0 {
                                     SetWindowLongW(
-                                        hwnd, GWL_EXSTYLE,
+                                        hwnd,
+                                        GWL_EXSTYLE,
                                         ((ex_style as u32) | WS_EX_LAYERED.0) as i32,
                                     );
                                     let _ = SetWindowPos(
-                                        hwnd, None, 0, 0, 0, 0,
-                                        SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER
-                                            | SWP_NOACTIVATE | SWP_FRAMECHANGED,
+                                        hwnd,
+                                        None,
+                                        0,
+                                        0,
+                                        0,
+                                        0,
+                                        SWP_NOMOVE
+                                            | SWP_NOSIZE
+                                            | SWP_NOZORDER
+                                            | SWP_NOACTIVATE
+                                            | SWP_FRAMECHANGED,
                                     );
                                 }
                             }
                         }
                     }
 
-                    let dpi_ctx = unsafe {
-                        windows::Win32::UI::HiDpi::GetThreadDpiAwarenessContext()
-                    };
+                    let dpi_ctx =
+                        unsafe { windows::Win32::UI::HiDpi::GetThreadDpiAwarenessContext() };
                     let awareness = unsafe {
                         windows::Win32::UI::HiDpi::GetAwarenessFromDpiAwarenessContext(dpi_ctx)
                     };

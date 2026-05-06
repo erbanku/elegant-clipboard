@@ -45,5 +45,5 @@ format:
 	@Write-Host "[format] eslint autofix"
 	npm run lint:fix
 	@Write-Host "[format] rustfmt"
-	cargo fmt --manifest-path src-tauri/Cargo.toml
+	Set-Location src-tauri; Get-ChildItem -Path src -Recurse -Filter *.rs | ForEach-Object { rustup run stable rustfmt --edition 2024 $$_.FullName }
 	@Write-Host "[format] done"

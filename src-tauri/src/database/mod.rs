@@ -6,7 +6,7 @@ pub use schema::*;
 
 use crate::clipboard::compute_semantic_hash;
 use parking_lot::Mutex;
-use rusqlite::{params, Connection, OpenFlags};
+use rusqlite::{Connection, OpenFlags, params};
 use std::path::PathBuf;
 use std::sync::Arc;
 use tracing::info;
@@ -199,7 +199,7 @@ impl Database {
                     color TEXT,
                     sort_order INTEGER DEFAULT 0,
                     created_at TEXT DEFAULT (datetime('now', 'localtime'))
-                );"
+                );",
             )?;
 
             // 建新表（含 group_id）
@@ -255,7 +255,7 @@ impl Database {
                             CASE WHEN is_favorite = 1 THEN sort_order ELSE 0 END, sort_order,
                             created_at, updated_at, access_count, last_accessed_at, char_count,
                             source_app_name, source_app_icon, NULL
-                     FROM clipboard_items;"
+                     FROM clipboard_items;",
                 )?;
             }
 
@@ -264,7 +264,7 @@ impl Database {
                 "DELETE FROM clipboard_items_new WHERE id NOT IN (
                     SELECT MAX(id) FROM clipboard_items_new
                     GROUP BY COALESCE(CAST(group_id AS TEXT), 'NULL'), content_hash
-                );"
+                );",
             )?;
 
             // 删除旧表并重命名
@@ -336,9 +336,7 @@ impl Database {
 
         if !has_semantic_hash {
             info!("Migrating database: adding semantic_hash column");
-            conn.execute_batch(
-                "ALTER TABLE clipboard_items ADD COLUMN semantic_hash TEXT;",
-            )?;
+            conn.execute_batch("ALTER TABLE clipboard_items ADD COLUMN semantic_hash TEXT;")?;
         }
 
         Self::backfill_semantic_hashes(conn)?;

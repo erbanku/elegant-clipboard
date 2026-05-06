@@ -2,8 +2,8 @@ use super::{ClipboardContent, ClipboardHandler};
 use crate::database::Database;
 use clipboard_master::{CallbackResult, ClipboardHandler as CMHandler, Master};
 use parking_lot::Mutex;
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::thread::JoinHandle;
 use tauri::{AppHandle, Emitter};
 use tracing::{debug, error, info, warn};
@@ -120,11 +120,7 @@ impl ClipboardMonitor {
         match self
             .pause_count
             .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |current| {
-                if current > 0 {
-                    Some(current - 1)
-                } else {
-                    None
-                }
+                if current > 0 { Some(current - 1) } else { None }
             }) {
             Ok(prev) => debug!("Clipboard monitor resume (count: {})", prev - 1),
             Err(_) => warn!("Resume called when not paused"),
@@ -148,7 +144,6 @@ impl ClipboardMonitor {
         info!("Clipboard monitor user pause toggled: {}", now);
         now
     }
-
 }
 
 impl Default for ClipboardMonitor {
@@ -188,7 +183,10 @@ impl CMHandler for MonitorHandler {
             let guard = self.handler.lock();
             if let Some(ref handler) = *guard {
                 if handler.is_source_app_excluded(&source) {
-                    debug!("Clipboard change ignored (source app excluded: {:?})", source.as_ref().map(|s| &s.app_name));
+                    debug!(
+                        "Clipboard change ignored (source app excluded: {:?})",
+                        source.as_ref().map(|s| &s.app_name)
+                    );
                     return CallbackResult::Next;
                 }
                 handler.get_max_image_size()
@@ -243,7 +241,9 @@ fn read_clipboard_content_with_retry(max_image_bytes: usize) -> Option<Clipboard
 
     for attempt in 0..MAX_RETRIES {
         if attempt > 0 {
-            std::thread::sleep(std::time::Duration::from_millis(RETRY_DELAY_MS * attempt as u64));
+            std::thread::sleep(std::time::Duration::from_millis(
+                RETRY_DELAY_MS * attempt as u64,
+            ));
             debug!("Clipboard read retry {}/{}", attempt + 1, MAX_RETRIES);
         }
 
@@ -270,7 +270,10 @@ fn read_clipboard_content(max_image_bytes: usize) -> Option<ClipboardContent> {
     let ctx = match ClipboardContext::new() {
         Ok(c) => c,
         Err(e) => {
-            warn!("Failed to create clipboard context: {} (clipboard may be locked by another app)", e);
+            warn!(
+                "Failed to create clipboard context: {} (clipboard may be locked by another app)",
+                e
+            );
             return None;
         }
     };
@@ -294,7 +297,9 @@ fn read_clipboard_content(max_image_bytes: usize) -> Option<ClipboardContent> {
             // 基于原始 RGBA 像素数粗估，超限则跳过，避免对超大图进行 PNG 编码（CPU 密集）
             // PNG 压缩后通常小于原始像素，这里使用原始字节数作为上界近似
             if max_image_bytes > 0 {
-                let raw_bytes = (width as u64).saturating_mul(height as u64).saturating_mul(4);
+                let raw_bytes = (width as u64)
+                    .saturating_mul(height as u64)
+                    .saturating_mul(4);
                 if raw_bytes > max_image_bytes as u64 {
                     warn!(
                         "Clipboard image {}x{} (~{} bytes raw) exceeds max image size {} bytes, skipping",
@@ -313,7 +318,10 @@ fn read_clipboard_content(max_image_bytes: usize) -> Option<ClipboardContent> {
                 Err(e) => warn!("Failed to convert clipboard image to PNG: {}", e),
             }
         }
-        Err(e) => debug!("Clipboard get_image failed: {} (may not contain image data or format unsupported)", e),
+        Err(e) => debug!(
+            "Clipboard get_image failed: {} (may not contain image data or format unsupported)",
+            e
+        ),
     }
 
     // 尝试获取 HTML
