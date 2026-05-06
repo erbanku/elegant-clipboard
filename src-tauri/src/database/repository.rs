@@ -382,13 +382,18 @@ impl ClipboardRepository {
 
         match target_id {
             Ok(id) => {
+                // 收藏项保持 sort_order / created_at 不变，避免被复制重复内容自动重排（issue #81）
                 conn.execute(
                     "UPDATE clipboard_items \
                      SET access_count = access_count + 1, \
                          last_accessed_at = datetime('now', 'localtime'), \
                          updated_at = datetime('now', 'localtime'), \
-                         created_at = datetime('now', 'localtime'), \
-                         sort_order = ?1 \
+                         created_at = CASE WHEN is_favorite = 1 \
+                                           THEN created_at \
+                                           ELSE datetime('now', 'localtime') END, \
+                         sort_order = CASE WHEN is_favorite = 1 \
+                                           THEN sort_order \
+                                           ELSE ?1 END \
                      WHERE id = ?2",
                     params![new_sort, id],
                 )?;
@@ -875,6 +880,7 @@ impl ClipboardRepository {
     /// `is_pinned DESC, sort_order DESC`，置顶条目始终在前，
     /// 本条目将出现在所有非置顶条目的最前面。
     /// 已置顶的条目不作处理，避免打乱用户手动排列的置顶顺序。
+    /// 已收藏的条目同样不作处理，避免每次粘贴/复制重新排序收藏列表（issue #81）。
     pub fn bump_to_top(&self, id: i64) -> Result<(), rusqlite::Error> {
         let conn = self.write_conn.lock();
         let max_sort: i64 = conn
@@ -885,13 +891,14 @@ impl ClipboardRepository {
             )
             .unwrap_or(0);
         let affected = conn.execute(
-            "UPDATE clipboard_items SET sort_order = ?1 WHERE id = ?2 AND is_pinned = 0",
+            "UPDATE clipboard_items SET sort_order = ?1 \
+             WHERE id = ?2 AND is_pinned = 0 AND is_favorite = 0",
             params![max_sort + 1, id],
         )?;
         if affected > 0 {
             debug!("Bumped item {} to top (sort_order: {})", id, max_sort + 1);
         } else {
-            debug!("Skipped bump for item {} (pinned or not found)", id);
+            debug!("Skipped bump for item {} (pinned, favorite, or not found)", id);
         }
         Ok(())
     }

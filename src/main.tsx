@@ -1,6 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { initUISettingsStore } from "@/stores/ui-settings";
 import App from "./App";
 import { Settings } from "./pages/Settings";
 import { TextEditor } from "./pages/TextEditor";
@@ -41,10 +42,16 @@ function Router() {
   return <App />;
 }
 
-ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
-  <React.StrictMode>
-    <TooltipProvider delayDuration={300}>
-      <Router />
-    </TooltipProvider>
-  </React.StrictMode>,
-);
+async function bootstrap() {
+  await initUISettingsStore();
+
+  ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
+    <React.StrictMode>
+      <TooltipProvider delayDuration={300}>
+        <Router />
+      </TooltipProvider>
+    </React.StrictMode>,
+  );
+}
+
+void bootstrap();

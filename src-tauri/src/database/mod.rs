@@ -350,6 +350,68 @@ impl Database {
                ON clipboard_items(group_id, semantic_hash) WHERE group_id IS NOT NULL;",
         )?;
 
+        // 迁移 9: 修复 issue #81 中残留的乱序数据。
+        // 当存在重复或为零的 favorite_order 时，按用户当前看到的顺序
+        // (favorite_order DESC, id DESC) 重新分配单调递增、互不相同的整数，
+        // 之后的 bump_to_top / touch_by_column 修复将永久保护此顺序不被自动重排。
+        Self::normalize_favorite_order(conn)?;
+
+        Ok(())
+    }
+
+    /// 将所有 `is_favorite = 1` 的条目的 `favorite_order` 规整为
+    /// 单调递增、互不相同的整数，保留当前显示顺序。
+    /// 当不存在重复或零值时直接跳过，避免无谓写入。
+    fn normalize_favorite_order(conn: &Connection) -> Result<(), rusqlite::Error> {
+        // 是否存在并列或为零的 favorite_order
+        let needs_fix: bool = conn.query_row(
+            "SELECT (COUNT(*) > COUNT(DISTINCT favorite_order)) \
+             OR EXISTS(SELECT 1 FROM clipboard_items WHERE is_favorite = 1 AND favorite_order <= 0) \
+             FROM clipboard_items WHERE is_favorite = 1",
+            [],
+            |row| row.get(0),
+        ).unwrap_or(false);
+
+        if !needs_fix {
+            return Ok(());
+        }
+
+        // 取出所有收藏项 id，按当前显示顺序排列（最前面的在最前）
+        let ids: Vec<i64> = {
+            let mut stmt = conn.prepare(
+                "SELECT id FROM clipboard_items \
+                 WHERE is_favorite = 1 \
+                 ORDER BY favorite_order DESC, id DESC",
+            )?;
+            stmt.query_map([], |row| row.get::<_, i64>(0))?
+                .filter_map(|r| r.ok())
+                .collect()
+        };
+
+        if ids.is_empty() {
+            return Ok(());
+        }
+
+        info!(
+            "Migrating database: normalizing favorite_order for {} items",
+            ids.len()
+        );
+
+        let total = ids.len() as i64;
+        let tx = conn.unchecked_transaction()?;
+        {
+            let mut stmt = tx.prepare(
+                "UPDATE clipboard_items SET favorite_order = ?1 \
+                 WHERE id = ?2 AND is_favorite = 1",
+            )?;
+            for (idx, id) in ids.iter().enumerate() {
+                let new_order = total - idx as i64; // 最前面的得到最大值
+                stmt.execute(params![new_order, id])?;
+            }
+        }
+        tx.commit()?;
+
+        info!("Migration complete: favorite_order normalized");
         Ok(())
     }
 

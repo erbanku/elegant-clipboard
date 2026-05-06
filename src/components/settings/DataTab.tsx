@@ -271,8 +271,6 @@ export function DataTab({ settings, onSettingsChange }: DataTabProps) {
       await invoke(config.command);
       setCleanDialogAction(null);
       if (config.needsRestart) {
-        // 清除前端持久化设置以免重启后残留
-        localStorage.removeItem("clipboard-ui-settings");
         sessionStorage.removeItem("data-size-cache");
         await invoke("restart_app");
       } else {
