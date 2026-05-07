@@ -294,16 +294,15 @@ fn read_clipboard_content(max_image_bytes: usize) -> Option<ClipboardContent> {
             let (width, height) = img.get_size();
             debug!("Got image from clipboard: {}x{}", width, height);
 
-            // 基于原始 RGBA 像素数粗估，超限则跳过，避免对超大图进行 PNG 编码（CPU 密集）
-            // PNG 压缩后通常小于原始像素，这里使用原始字节数作为上界近似
+            // 在 PNG 编码前估算最终字节大小，超限则跳过，避免对超大图进行 CPU 密集的编码。
+            // 经验：PNG 压缩比通常 ≥ 4（截图/纯色更高，摄影/真随机最低），
+            // 故按"每像素约 1 字节"作为 PNG 字节数的近似上界——与 UI 上"图片大小"语义一致。
             if max_image_bytes > 0 {
-                let raw_bytes = (width as u64)
-                    .saturating_mul(height as u64)
-                    .saturating_mul(4);
-                if raw_bytes > max_image_bytes as u64 {
+                let estimated_png_bytes = (width as u64).saturating_mul(height as u64);
+                if estimated_png_bytes > max_image_bytes as u64 {
                     warn!(
-                        "Clipboard image {}x{} (~{} bytes raw) exceeds max image size {} bytes, skipping",
-                        width, height, raw_bytes, max_image_bytes
+                        "Clipboard image {}x{} (~{} bytes estimated PNG) exceeds max {} bytes, skipping",
+                        width, height, estimated_png_bytes, max_image_bytes
                     );
                     return None;
                 }

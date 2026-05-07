@@ -348,10 +348,12 @@ impl Database {
                ON clipboard_items(group_id, semantic_hash) WHERE group_id IS NOT NULL;",
         )?;
 
-        // 迁移 9: 修复 issue #81 中残留的乱序数据。
-        // 当存在重复或为零的 favorite_order 时，按用户当前看到的顺序
-        // (favorite_order DESC, id DESC) 重新分配单调递增、互不相同的整数，
-        // 之后的 bump_to_top / touch_by_column 修复将永久保护此顺序不被自动重排。
+        // 迁移 9: 修复 issue #81 收藏顺序乱跳的根因——存量数据中存在重复或零值
+        // favorite_order，导致收藏列表排序退化为 sort_order/created_at 等次级键，
+        // 进而被复制/粘贴动作引发的 bump_to_top / touch_by_column 间接打乱。
+        // 这里按用户当前看到的顺序 (favorite_order DESC, id DESC) 重新分配单调递增、
+        // 互不相同的整数；toggle_favorite / move_favorite_item_by_id 已天然保证
+        // favorite_order 唯一，所以一次规整后就不会再退化。
         Self::normalize_favorite_order(conn)?;
 
         Ok(())

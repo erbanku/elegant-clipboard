@@ -296,19 +296,6 @@ impl ClipboardHandler {
             }
         }
 
-        // 图片单独应用大小上限，避免超大图片阻塞监听线程与数据库写入
-        if let ClipboardContent::Image(ref data) = content {
-            let max_image_size = self.get_max_image_size();
-            if max_image_size > 0 && data.len() > max_image_size {
-                warn!(
-                    "Image size {} bytes exceeds max {} bytes, skipping",
-                    data.len(),
-                    max_image_size
-                );
-                return Ok(None);
-            }
-        }
-
         let hashes = self.calculate_hashes(&content);
         let dedup = self.get_dedup_strategy();
         let text_like = Self::is_text_like_content(&content);

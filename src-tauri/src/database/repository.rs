@@ -395,18 +395,13 @@ impl ClipboardRepository {
 
         match target_id {
             Ok(id) => {
-                // 收藏项保持 sort_order / created_at 不变，避免被复制重复内容自动重排（issue #81）
                 conn.execute(
                     "UPDATE clipboard_items \
                      SET access_count = access_count + 1, \
                          last_accessed_at = datetime('now', 'localtime'), \
                          updated_at = datetime('now', 'localtime'), \
-                         created_at = CASE WHEN is_favorite = 1 \
-                                           THEN created_at \
-                                           ELSE datetime('now', 'localtime') END, \
-                         sort_order = CASE WHEN is_favorite = 1 \
-                                           THEN sort_order \
-                                           ELSE ?1 END \
+                         created_at = datetime('now', 'localtime'), \
+                         sort_order = ?1 \
                      WHERE id = ?2",
                     params![new_sort, id],
                 )?;

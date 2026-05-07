@@ -62,7 +62,7 @@ export function Settings() {
   
   const [settings, setSettings] = useState<AppSettings>({
     data_path: "",
-    max_history_count: 1000,
+    max_history_count: 10000,
     max_content_size_kb: 1024,
     max_image_size_kb: 51200,
     auto_cleanup_days: 30,
@@ -171,7 +171,7 @@ export function Settings() {
 
       setSettings({
         data_path: dataPath || "",
-        max_history_count: maxHistoryCount ? parseInt(maxHistoryCount) : 1000,
+        max_history_count: maxHistoryCount ? parseInt(maxHistoryCount) : 10000,
         max_content_size_kb: maxContentSize ? parseInt(maxContentSize) : 1024,
         max_image_size_kb: maxImageSize ? parseInt(maxImageSize) : 51200,
         auto_cleanup_days: autoCleanupDays ? parseInt(autoCleanupDays) : 30,
