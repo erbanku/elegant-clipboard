@@ -15,6 +15,7 @@ export const DEFAULT_TOOLBAR_BUTTONS: ToolbarButton[] = ["clear", "batch", "pin"
 export const MAX_TOOLBAR_BUTTONS = 5;
 
 const UI_SETTINGS_DB_KEY = "ui_settings_json";
+const LEGACY_UI_SETTINGS_STORAGE_KEY = "clipboard-ui-settings";
 const SYNC_EVENT = "ui-settings-changed";
 
 interface UISettingsData {
@@ -181,6 +182,40 @@ function mergeUISettings(raw: unknown): UISettingsData {
   };
 }
 
+function readLegacyUISettings(): UISettingsData | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const raw = window.localStorage.getItem(LEGACY_UI_SETTINGS_STORAGE_KEY);
+  if (!raw) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as { state?: unknown } | unknown;
+    const state = parsed && typeof parsed === "object" && "state" in parsed
+      ? (parsed as { state?: unknown }).state
+      : parsed;
+    return mergeUISettings(state);
+  } catch (error) {
+    logError("Failed to parse legacy UI settings:", error);
+    return null;
+  }
+}
+
+function clearLegacyUISettings() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    window.localStorage.removeItem(LEGACY_UI_SETTINGS_STORAGE_KEY);
+  } catch (error) {
+    logError("Failed to clear legacy UI settings:", error);
+  }
+}
+
 async function saveUISettings(state: UISettingsData) {
   await invoke("set_setting", {
     key: UI_SETTINGS_DB_KEY,
@@ -303,12 +338,22 @@ export function loadUISettingsFromBackend() {
   }
 
   return invoke<string | null>("get_setting", { key: UI_SETTINGS_DB_KEY })
-    .then((value) => {
-      if (!value) {
+    .then(async (value) => {
+      if (value) {
+        const parsed = JSON.parse(value);
+        useUISettings.setState(mergeUISettings(parsed));
+        clearLegacyUISettings();
         return;
       }
-      const parsed = JSON.parse(value);
-      useUISettings.setState(mergeUISettings(parsed));
+
+      const legacy = readLegacyUISettings();
+      if (!legacy) {
+        return;
+      }
+
+      useUISettings.setState(legacy);
+      await saveUISettings(legacy);
+      clearLegacyUISettings();
     })
     .catch((error) => {
       logError("Failed to load UI settings:", error);
