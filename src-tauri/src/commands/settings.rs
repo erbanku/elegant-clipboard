@@ -1,7 +1,7 @@
 use crate::database::SettingsRepository;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tauri::State;
+use tauri::{Manager, State};
 
 use super::AppState;
 

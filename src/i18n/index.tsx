@@ -34,8 +34,33 @@ function interpolate(template: string, values?: TranslationValues) {
   return template.replace(/\{(\w+)\}/g, (_, name: string) => String(values[name] ?? `{${name}}`));
 }
 
+const dynamicMessagePatterns = Object.entries(EN_MESSAGES)
+  .filter(([key]) => key.includes("{") && key.includes("}") && !key.endsWith("__plural"))
+  .map(([key, template]) => {
+    const names: string[] = [];
+    const pattern = key
+      .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+      .replace(/\\\{(\w+)\\\}/g, (_, name: string) => {
+        names.push(name);
+        return "(.+?)";
+      });
+    return { regex: new RegExp(`^${pattern}$`), names, template };
+  });
+
+function translateDynamicPattern(key: string) {
+  for (const { regex, names, template } of dynamicMessagePatterns) {
+    const match = key.match(regex);
+    if (!match) continue;
+    const values = Object.fromEntries(names.map((name, index) => [name, match[index + 1]]));
+    return interpolate(template, values);
+  }
+  return key;
+}
+
 export function translate(key: string, values?: TranslationValues, locale = currentLocale) {
-  const template = locale === "en-US" ? EN_MESSAGES[key] ?? key : key;
+  const template = locale === "en-US"
+    ? EN_MESSAGES[key] ?? (values ? key : translateDynamicPattern(key))
+    : key;
   if (
     locale === "en-US"
     && typeof values?.count === "number"

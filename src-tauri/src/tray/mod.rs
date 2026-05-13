@@ -52,6 +52,9 @@ pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
         ],
     )?;
 
+    let pause_item_for_handler = pause_item.clone();
+    let shortcut_item_for_handler = shortcut_item.clone();
+
     let _tray = TrayIconBuilder::with_id("main-tray")
         .icon(icon)
         .menu(&menu)
@@ -64,7 +67,7 @@ pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
                     if let Some(state) = app.try_state::<Arc<AppState>>() {
                         let paused = state.monitor.toggle_user_pause();
                         let current_language = current_language(&SettingsRepository::new(&app.state::<Arc<AppState>>().db));
-                        let _ = pause_item.set_text(if paused {
+                        let _ = pause_item_for_handler.set_text(if paused {
                             tr(current_language, "恢复监控")
                         } else {
                             tr(current_language, "暂停监控")
@@ -82,7 +85,7 @@ pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
                 "toggle_shortcuts" => {
                     let disabled = crate::toggle_shortcuts_disabled(app);
                     let current_language = current_language(&SettingsRepository::new(&app.state::<Arc<AppState>>().db));
-                    let _ = shortcut_item.set_text(if disabled {
+                    let _ = shortcut_item_for_handler.set_text(if disabled {
                         tr(current_language, "恢复快捷键")
                     } else {
                         tr(current_language, "禁用快捷键")

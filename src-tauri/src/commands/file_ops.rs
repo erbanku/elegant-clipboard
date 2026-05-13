@@ -1,7 +1,7 @@
 use crate::database::ClipboardRepository;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tauri::State;
+use tauri::{Manager, State};
 use tracing::{debug, info};
 
 use super::{
